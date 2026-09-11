@@ -1,0 +1,26 @@
+{
+	"name": "theseoframework/wp-plugin-regression",
+	"description": "WordPress Playground launcher, capture, and compare for plugin regression.",
+	"keywords": [
+		"wordpress",
+		"playground",
+		"regression"
+	],
+	"license": "GPL-3.0-only",
+	"homepage": "https://theseoframework.com/",
+	"authors": [
+		{
+			"name": "Sybre Waaijer",
+			"email": "sybrew@users.noreply.github.com",
+			"homepage": "https://cyberwire.nl/",
+			"role": "Developer"
+		}
+	],
+	"main": "run.js",
+	"engines": {
+		"node": ">=20.18.0"
+	},
+	"dependencies": {
+		"@wp-playground/cli": "3.1.48"
+	}
+}
