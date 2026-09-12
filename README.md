@@ -31,15 +31,30 @@ node run.js capture --root C:\path\to\plugin --plugin-json C:\path\to\plugin.jso
 node run.js compare --root C:\path\to\plugin --plugin-json C:\path\to\plugin.json --before before --after after
 node run.js harness --root C:\path\to\plugin --action ping
 node run.js harness --root C:\path\to\plugin --json-file C:\path\to\payload.json
+node run.js surfaces --root C:\path\to\plugin --plugin-json C:\path\to\plugin.json
 ```
 
 Optional launch flags: `--wp`, `--php`, `--site`, `--plugin=working|wporg`, `--port`.
 
+`--wp` is a Playground build slug (`latest`, `beta`, `trunk` / `nightly`, `7.0`, `6.9.1`, `6.8-RC1`, or a zip URL), not a path to Core. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. Stop, then launch with a new `--site` when changing `--wp` or `--php`. Do not reuse one site SQLite across majors. PHP is `--php` (`7.4`–`8.5`).
+
+A/B is two capture labels and `compare --before <prev> --after <cur>`. The mounted plugin is live: capture `before` before editing, or compare against an existing gold bundle. `--plugin=wporg` then `--plugin=working` on the same `--site` is release vs tree. Do not reuse one `--site` across `--wp` versions.
+
+This engine does not drive a browser. Logged-out HTTP capture covers front-end artifacts. Admin UI and REST-from-the-browser A/B is a Playwright MCP consumer of the live site URL after `launch`.
+
+`plugin.json` may list `entries` (id, type, path, optional frame), `surfaces` (feature → page types), `surfaceLines` (feature → substrings), and `headTags` (regexes). `capture` writes one `captures/<label>.json` bundle. HTML captures store the plugin head-marker block, then prepend `headTags` matches from `<head>` that are not already in that block. Those extras are ambiguous (theme, core, or the plugin). `capture` / `compare` accept `--feature=<name>` or `--types=post,page` and print that feature’s page list first. `compare --feature` then diffs only matching lines (plus status/location). `surfaces` prints the whole map.
+
+`harness` action `frame` asks the consumer to switch a reading frame (for example blog-on-front vs a static front page).
+
 Captures are logged-out. The server is not started with `--login`. Same-path redirects are followed; a redirect to a different path is recorded as-is.
+
+`capture` also accepts `--path` / `--paths` (comma-separated) and appends those URLs to the bundle.
+
+Harness `post` and `term` accept `slug`, `meta` (object), and optional `id` to update. Replies include `url` and `path`. `meta` writes one key (`type` is `post` or `term`). Consumer shims may handle plugin-specific meta via `wp_plugin_regression_update_meta`.
 
 Pretty permalinks are set in the blueprint, but rewrite rules are not flushed there. Playground must flush them on a later `init` after post types exist. A `flush_rewrite_rules()` during boot writes incomplete rules and makes post permalinks and 404s fall through to the homepage.
 
-Playground ships a mu-plugin that 301s `/sitemap.xml` to `/wp-sitemap.xml`. Launch blanks that file so the mounted plugin can own the endpoint.
+Workaround until [WordPress/wordpress-playground#4325](https://github.com/WordPress/wordpress-playground/issues/4325) is patched: Playground ships a mu-plugin that 301s `/sitemap.xml` to `/wp-sitemap.xml`. Launch overwrites that file with a valid PHP no-op so the mounted plugin can own the endpoint. Drop the overwrite when that issue lands. Do not write `'<?php\n'` in a single-quoted PHP string; that is a parse error and every request 500s.
 
 State is written under the consumer `.local/playground/`, not in this folder.
 

@@ -69,6 +69,9 @@ function wp_plugin_regression_harness() {
 		case 'plugin':
 			wp_plugin_regression_plugin( $body );
 			break;
+		case 'frame':
+			wp_plugin_regression_frame( $body );
+			break;
 		default:
 			wp_plugin_regression_reply( [ 'error' => 'unknown action' ], 400 );
 	}
@@ -147,16 +150,17 @@ function wp_plugin_regression_post( $body ) {
 	if ( ! empty( $body['id'] ) )
 		$args['ID'] = (int) $body['id'];
 
+	if ( ! empty( $body['slug'] ) )
+		$args['post_name'] = $body['slug'];
+
 	$id = wp_insert_post( $args, true );
 
 	if ( is_wp_error( $id ) )
 		wp_plugin_regression_reply( [ 'error' => $id->get_error_message() ], 400 );
 
-	wp_plugin_regression_reply( [
-		'ok'  => true,
-		'id'  => $id,
-		'url' => get_permalink( $id ),
-	] );
+	wp_plugin_regression_apply_meta( $id, $body['meta'] ?? null, 'post' );
+
+	wp_plugin_regression_reply( wp_plugin_regression_entity_reply( $id, 'post' ) );
 }
 
 /**
@@ -168,26 +172,42 @@ function wp_plugin_regression_post( $body ) {
  */
 function wp_plugin_regression_term( $body ) {
 
-	if ( empty( $body['name'] ) )
-		wp_plugin_regression_reply( [ 'error' => 'name required' ], 400 );
-
 	$taxonomy = $body['taxonomy'] ?? 'category';
-	$result   = wp_insert_term(
-		$body['name'],
-		$taxonomy,
-		[
-			'slug' => $body['slug'] ?? '',
-		],
-	);
+
+	if ( ! empty( $body['id'] ) ) {
+		$args = [];
+
+		if ( isset( $body['name'] ) )
+			$args['name'] = $body['name'];
+
+		if ( isset( $body['slug'] ) )
+			$args['slug'] = $body['slug'];
+
+		$result = wp_update_term( (int) $body['id'], $taxonomy, $args );
+	} else {
+		if ( empty( $body['name'] ) )
+			wp_plugin_regression_reply( [ 'error' => 'name required' ], 400 );
+
+		$result = wp_insert_term(
+			$body['name'],
+			$taxonomy,
+			[
+				'slug' => $body['slug'] ?? '',
+			],
+		);
+	}
 
 	if ( is_wp_error( $result ) )
 		wp_plugin_regression_reply( [ 'error' => $result->get_error_message() ], 400 );
 
-	wp_plugin_regression_reply( [
-		'ok'       => true,
-		'id'       => $result['term_id'],
-		'taxonomy' => $taxonomy,
-	] );
+	$id = (int) $result['term_id'];
+
+	wp_plugin_regression_apply_meta( $id, $body['meta'] ?? null, 'term' );
+
+	$reply             = wp_plugin_regression_entity_reply( $id, 'term', $taxonomy );
+	$reply['taxonomy'] = $taxonomy;
+
+	wp_plugin_regression_reply( $reply );
 }
 
 /**
@@ -203,17 +223,130 @@ function wp_plugin_regression_meta( $body ) {
 		wp_plugin_regression_reply( [ 'error' => 'id and key required' ], 400 );
 
 	$id    = (int) $body['id'];
+	$type  = $body['type'] ?? 'post';
 	$key   = $body['key'];
 	$value = $body['value'] ?? '';
 
-	if ( 'term' === ( $body['type'] ?? 'post' ) )
-		$ok = update_term_meta( $id, $key, $value );
+	wp_plugin_regression_write_meta( $id, $key, $value, $type );
+
+	$tax = $body['taxonomy'] ?? ( 'term' === $type ? 'category' : '' );
+
+	wp_plugin_regression_reply(
+		wp_plugin_regression_entity_reply( $id, $type, $tax ),
+	);
+}
+
+/**
+ * Writes one post or term meta key. Consumer shims may handle plugin-specific bags.
+ *
+ * @since 1.0.0
+ *
+ * @param int    $id    Object ID.
+ * @param string $key   Meta key.
+ * @param mixed  $value Meta value.
+ * @param string $type  `post` or `term`.
+ */
+function wp_plugin_regression_write_meta( $id, $key, $value, $type ) {
+
+	/**
+	 * @param bool   $handled Whether a consumer handled the write.
+	 * @param int    $id      Object ID.
+	 * @param string $key     Meta key.
+	 * @param mixed  $value   Meta value.
+	 * @param string $type    `post` or `term`.
+	 */
+	$handled = apply_filters(
+		'wp_plugin_regression_update_meta',
+		false,
+		$id,
+		$key,
+		$value,
+		$type,
+	);
+
+	if ( $handled ) return;
+
+	if ( 'term' === $type )
+		update_term_meta( $id, $key, $value );
 	else
-		$ok = update_post_meta( $id, $key, $value );
+		update_post_meta( $id, $key, $value );
+}
+
+/**
+ * Writes many meta keys from a harness `meta` object.
+ *
+ * @since 1.0.0
+ *
+ * @param int         $id   Object ID.
+ * @param array|mixed $meta Key/value pairs.
+ * @param string      $type `post` or `term`.
+ */
+function wp_plugin_regression_apply_meta( $id, $meta, $type ) {
+
+	if ( ! is_array( $meta ) ) return;
+
+	foreach ( $meta as $key => $value )
+		wp_plugin_regression_write_meta( $id, $key, $value, $type );
+}
+
+/**
+ * Builds a post or term harness reply.
+ *
+ * @since 1.0.0
+ *
+ * @param int    $id       Object ID.
+ * @param string $type     `post` or `term`.
+ * @param string $taxonomy Taxonomy when `$type` is `term`.
+ * @return array
+ */
+function wp_plugin_regression_entity_reply( $id, $type, $taxonomy = 'category' ) {
+
+	if ( 'term' === $type ) {
+		$link = get_term_link( $id, $taxonomy );
+
+		if ( is_wp_error( $link ) )
+			$link = '';
+	} else {
+		$link = get_permalink( $id ) ?: '';
+	}
+
+	$path = $link ? (string) wp_parse_url( $link, PHP_URL_PATH ) : '';
+
+	return [
+		'ok'   => true,
+		'id'   => $id,
+		'url'  => $link,
+		'path' => $path,
+	];
+}
+
+/**
+ * Applies a named reading frame. Consumer shims set options.
+ *
+ * @since 1.0.0
+ *
+ * @param array $body Request body.
+ */
+function wp_plugin_regression_frame( $body ) {
+
+	if ( empty( $body['name'] ) )
+		wp_plugin_regression_reply( [ 'error' => 'name required' ], 400 );
+
+	$name = $body['name'];
+
+	/**
+	 * @param bool   $handled Whether a consumer applied the frame.
+	 * @param string $name    Frame name.
+	 */
+	$handled = apply_filters(
+		'wp_plugin_regression_frame',
+		false,
+		$name,
+	);
 
 	wp_plugin_regression_reply( [
-		'ok' => false !== $ok,
-		'id' => $id,
+		'ok'   => (bool) $handled,
+		'name' => $name,
 	] );
 }
 

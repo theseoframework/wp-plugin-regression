@@ -27,11 +27,12 @@ const { stop }           = require( './lib/stop' );
 const { capture }        = require( './lib/capture' );
 const { compare }        = require( './lib/compare' );
 const { harness }        = require( './lib/harness' );
+const { printSurfaces }  = require( './lib/surfaces' );
 const { loadPluginJson } = require( './lib/state' );
 
 const USAGE = `Usage: node run.js <command> --root <consumer> [--plugin-json <file>]
 
-Commands: launch, stop, capture, compare, harness
+Commands: launch, stop, capture, compare, harness, surfaces
 `;
 
 /**
@@ -51,7 +52,7 @@ async function main() {
 
 	try {
 		if (
-			   [ 'launch', 'capture', 'compare' ].includes( command )
+			   [ 'launch', 'capture', 'compare', 'surfaces' ].includes( command )
 			&& ! flags['plugin-json']
 		) {
 			throw new Error( '--plugin-json is required.' );
@@ -72,6 +73,9 @@ async function main() {
 				break;
 			case 'harness':
 				await harness( flags, parsed.rest );
+				break;
+			case 'surfaces':
+				printSurfaces( loadPluginJson( flags['plugin-json'] ) );
 				break;
 			default:
 				throw new Error( `Unknown command ${command}.` );
