@@ -34,11 +34,13 @@ node run.js harness --root C:\path\to\plugin --json-file C:\path\to\payload.json
 node run.js surfaces --root C:\path\to\plugin --plugin-json C:\path\to\plugin.json
 ```
 
-Optional launch flags: `--wp`, `--php`, `--site`, `--plugin=working|wporg`, `--port`.
+Optional launch flags: `--wp`, `--php`, `--site`, `--plugin=working|wporg`, `--port`, `--pair`, `--keep`.
 
-`--wp` is a Playground build slug (`latest`, `beta`, `trunk` / `nightly`, `7.0`, `6.9.1`, `6.8-RC1`, or a zip URL), not a path to Core. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. Stop, then launch with a new `--site` when changing `--wp` or `--php`. Do not reuse one site SQLite across majors. PHP is `--php` (`7.4`–`8.5`). Official Core zips still ship several Twenty* themes; there is no one-theme bundle. Launch reuses Playground’s cached zip (`~/.wordpress-playground/`), unpacks a private copy, keeps `WP_DEFAULT_THEME` (Twenty Twenty-Five on current majors), and mounts that tree with `install-from-existing-files` so the extras are never extracted.
+`--wp` is a Playground build slug (`latest`, `beta`, `trunk` / `nightly`, `7.0`, `6.9.1`, `6.8-RC1`, or a zip URL), not a path to Core. `resolveWordPressRelease()` turns that slug into `{ version, releaseUrl }` (for example `latest` → `7.1` and the zip URL). Playground caches the zip as `~/.wordpress-playground/<version>.zip`. The engine unpacks a slim copy at `~/.wordpress-playground/wp/<version>/` (same version token), keeps `WP_DEFAULT_THEME`, and mounts it with `install-from-existing-files`. Official Core zips still ship several Twenty* themes; there is no one-theme bundle.
 
-A/B is two capture labels and `compare --before <prev> --after <cur>`. The mounted plugin is live: capture `before` before editing, or compare against an existing gold bundle. `--plugin=wporg` then `--plugin=working` on the same `--site` is release vs tree. Do not reuse one `--site` across `--wp` versions.
+Site persist is not in the consumer repo. It lives at `~/.wordpress-playground/tests/<plugin.slug>/<version>/<site>/`. Launch wipes that folder unless you pass `--keep`. Live runs are listed in `~/.wordpress-playground/tests/runs.json`. `stop` with no `--port` stops every run for `--root`. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. PHP is `--php` (`7.4`–`8.5`).
+
+A/B is two capture labels and `compare --before <prev> --after <cur>`. For a live side-by-side, `launch --pair` starts wordpress.org on `http://127.0.0.1:9001` (`--site=before`) and the working tree on `http://127.0.0.1:9002` (`--site=after`). `capture --label before` / `--label after` pick those sites. `compare` still diffs the JSON bundles. A single `launch` stays on port `9400`. Override pair ports with `--port-before` / `--port-after`. Do not reuse one persist folder across `--wp` versions.
 
 This engine does not drive a browser. Logged-out HTTP capture covers front-end artifacts. Admin UI and REST-from-the-browser A/B is a Playwright MCP consumer of the live site URL after `launch`.
 
@@ -58,12 +60,12 @@ Pretty permalinks are set in the blueprint, but rewrite rules are not flushed th
 
 Workaround until [WordPress/wordpress-playground#4325](https://github.com/WordPress/wordpress-playground/issues/4325) is patched: Playground ships a mu-plugin that 301s `/sitemap.xml` to `/wp-sitemap.xml`. Launch overwrites that file with a valid PHP no-op so the mounted plugin can own the endpoint. Drop the overwrite when that issue lands. Do not write `'<?php\n'` in a single-quoted PHP string; that is a parse error and every request 500s.
 
-State is written under the consumer `.local/playground/`, not in this folder.
+Captures stay under the consumer `.local/playground/captures/`. Sites, slim Core trees, wporg zips, and `runs.json` stay under `~/.wordpress-playground/`.
 
 ## Issues
 
 Node.js 20.18 or higher must be on your PATH.
 
-`stop` sends a graceful tree kill first, then force, and waits until `sites/<id>/database/.ht.sqlite` is unlocked. If a hard kill still leaves that file unreadable, retry launch or use `--site` with a new id. Deleting `.ht.sqlite` forces a fresh install for that site.
+`stop` sends a graceful tree kill first, then force, and waits until the site SQLite file is unlocked. If a hard kill still leaves that file unreadable, retry stop, then launch (default is a fresh wipe).
 
 PowerShell strips quotes from `--json "{...}"`. Use `--json-file <path>` (resolved from `--root` when relative).
