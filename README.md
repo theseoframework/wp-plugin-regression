@@ -4,6 +4,18 @@ This package boots a local WordPress Playground site, mounts a plugin, captures 
 
 ## Installation
 
+### Instant implementation
+
+In your open plugin repository, tell your AI agent:
+
+```md
+Implement https://github.com/theseoframework/wp-plugin-regression for this repo.
+```
+
+For live implementation examples, see [the-seo-framework](https://github.com/sybrew/the-seo-framework/tree/master/.cursor/skills/playground) and [troy](https://github.com/sybrew/troy/tree/main/.cursor/skills/playground).
+
+### Manual
+
 1. Import this Git's files to a private folder location.
 1. Open Terminal.
 1. `cd` to folder.
@@ -40,7 +52,9 @@ Optional launch flags: `--wp`, `--php`, `--site`, `--plugin=working|wporg`, `--p
 
 Site persist is not in the consumer repo. It lives at `~/.wordpress-playground/tests/<plugin.slug>/<version>/<site>/`. Launch wipes that folder unless you pass `--keep`. Live runs are listed in `~/.wordpress-playground/tests/runs.json`. `stop` with no `--port` stops every run for `--root`. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. PHP is `--php` (`7.4`–`8.5`).
 
-A/B is two capture labels and `compare --before <prev> --after <cur>`. For a live side-by-side, `launch --pair` starts wordpress.org on `http://127.0.0.1:9001` (`--site=before`) and the working tree on `http://127.0.0.1:9002` (`--site=after`). `capture --label before` / `--label after` pick those sites. `compare` diffs the JSON bundles and does not need a live server; each bundle's origin is rewritten independently. A single `launch` stays on port `9400`. Override pair ports with `--port-before` / `--port-after`. Do not reuse one persist folder across `--wp` versions.
+Launch sets the site title to `<plugin name> Playground` (plugin.json `name`, else the Plugin Name header, else `slug`). Agents may change `blogname` afterward.
+
+A/B is two capture labels and `compare --before <prev> --after <cur>`. Launch takes the next free port in `9001`–`9099`. `launch --pair` takes the next two consecutive ports (wordpress.org `--site=before`, working tree `--site=after`). `capture --label before` / `--label after` pick those sites. `compare` diffs the JSON bundles and does not need a live server; each bundle's origin is rewritten independently. Pin ports with `--port` or `--port-before` / `--port-after`. Do not reuse one persist folder across `--wp` versions.
 
 This engine does not drive a browser. Logged-out HTTP capture covers front-end artifacts. Admin UI and REST-from-the-browser A/B is a Playwright MCP consumer of the live site URL after `launch`.
 
