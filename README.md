@@ -36,13 +36,15 @@ node run.js surfaces --root C:\path\to\plugin --plugin-json C:\path\to\plugin.js
 
 Optional launch flags: `--wp`, `--php`, `--site`, `--plugin=working|wporg`, `--port`.
 
-`--wp` is a Playground build slug (`latest`, `beta`, `trunk` / `nightly`, `7.0`, `6.9.1`, `6.8-RC1`, or a zip URL), not a path to Core. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. Stop, then launch with a new `--site` when changing `--wp` or `--php`. Do not reuse one site SQLite across majors. PHP is `--php` (`7.4`–`8.5`).
+`--wp` is a Playground build slug (`latest`, `beta`, `trunk` / `nightly`, `7.0`, `6.9.1`, `6.8-RC1`, or a zip URL), not a path to Core. `trunk` is the prebuilt WordPress/WordPress nightly. It is not a local `wordpress-develop` tree. `--wp=7.2` only works if Playground hosts that release. Stop, then launch with a new `--site` when changing `--wp` or `--php`. Do not reuse one site SQLite across majors. PHP is `--php` (`7.4`–`8.5`). Official Core zips still ship several Twenty* themes; there is no one-theme bundle. Launch reuses Playground’s cached zip (`~/.wordpress-playground/`), unpacks a private copy, keeps `WP_DEFAULT_THEME` (Twenty Twenty-Five on current majors), and mounts that tree with `install-from-existing-files` so the extras are never extracted.
 
 A/B is two capture labels and `compare --before <prev> --after <cur>`. The mounted plugin is live: capture `before` before editing, or compare against an existing gold bundle. `--plugin=wporg` then `--plugin=working` on the same `--site` is release vs tree. Do not reuse one `--site` across `--wp` versions.
 
 This engine does not drive a browser. Logged-out HTTP capture covers front-end artifacts. Admin UI and REST-from-the-browser A/B is a Playwright MCP consumer of the live site URL after `launch`.
 
 `plugin.json` may list `entries` (id, type, path, optional frame), `surfaces` (feature → page types), `surfaceLines` (feature → substrings), and `headTags` (regexes). `capture` writes one `captures/<label>.json` bundle. HTML captures store the plugin head-marker block, then prepend `headTags` matches from `<head>` that are not already in that block. Those extras are ambiguous (theme, core, or the plugin). `capture` / `compare` accept `--feature=<name>` or `--types=post,page` and print that feature’s page list first. `compare --feature` then diffs only matching lines (plus status/location). `surfaces` prints the whole map.
+
+`--root` is the consumer repo (where `.local/playground` is written). Optional `dir` is a package folder relative to `--root`; mounts resolve from there. `activate` (default true) controls the blueprint `activatePlugin` step. `extraPlugins` is more `{ slug, dir, mainFile, mounts, activate }` entries mounted and optionally activated the same way. `extraMounts` is `[ hostRel, vfs ]` directory pairs resolved from `--root` (trees that must not land under `wp-content/plugins/`). When `vfs` is under `/wordpress/wp-content/`, the engine also hardlinks that tree into the persisted site so a parent `wp-content` mount cannot hide the files. Omit these fields for a single-plugin repo whose `--root` is the plugin itself.
 
 `harness` action `frame` asks the consumer to switch a reading frame (for example blog-on-front vs a static front page).
 
