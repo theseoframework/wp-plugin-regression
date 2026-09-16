@@ -22,6 +22,28 @@ defined( 'ABSPATH' ) or die;
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ * Playground blueprint eval.php does not chdir into the plugin folder.
+ * cwd-relative require_once then misses files that live under plugins/*.
+ * Every plugin directory is prepended; the first match wins.
+ *
+ * @since 1.0.0
+ */
+function wp_plugin_regression_plugin_include_path() {
+
+	$root = WP_CONTENT_DIR . '/plugins';
+
+	if ( ! is_dir( $root ) ) return;
+
+	$dirs = glob( $root . '/*', GLOB_ONLYDIR );
+
+	if ( ! $dirs ) return;
+
+	set_include_path( implode( PATH_SEPARATOR, $dirs ) . PATH_SEPARATOR . get_include_path() );
+}
+
+wp_plugin_regression_plugin_include_path();
+
 add_action( 'init', 'wp_plugin_regression_harness', 0 );
 
 /**

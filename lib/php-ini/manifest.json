@@ -1,0 +1,20 @@
+{
+	"name": "wpr-opcache",
+	"loadWithIniDirective": false,
+	"artifacts": [
+		{ "phpVersion": "7.4", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.0", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.1", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.2", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.3", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.4", "sourcePath": "dummy.so" },
+		{ "phpVersion": "8.5", "sourcePath": "dummy.so" }
+	],
+	"extraFiles": {
+		"vfsRoot": "/internal/shared",
+		"nodes": [
+			{ "vfsPath": "opcache", "type": "directory" },
+			{ "vfsPath": "php.ini", "type": "file", "sourcePath": "php.ini" }
+		]
+	}
+}
